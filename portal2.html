@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پرتال میکروبیولوژی - درسنامه تعاملی</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts (Vazirmatn for Persian) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Vazirmatn', sans-serif;
+            background-color: #1a1a2e;
+            color: #fff;
+            overflow: hidden; /* Prevent page scroll */
+        }
+
+        /* Main layout container */
+        .main-layout {
+            display: flex;
+            flex-direction: column; /* Stack on mobile */
+            height: 100vh;
+        }
+
+        @media (min-width: 768px) {
+            .main-layout {
+                flex-direction: row-reverse; /* Side-by-side on desktop, with sidebar on the right */
+            }
+        }
+
+        /* Sidebar for information */
+        .info-panel {
+            background: rgba(15, 15, 30, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+            height: 50vh; /* Half screen on mobile */
+            overflow-y: auto;
+        }
+
+        @media (min-width: 768px) {
+            .info-panel {
+                width: 320px;
+                flex-shrink: 0;
+                height: 100vh;
+            }
+        }
+        
+        /* Container for the 3D view */
+        .canvas-container {
+            position: relative;
+            flex-grow: 1;
+            height: 50vh; /* Half screen on mobile */
+        }
+
+        @media (min-width: 768px) {
+            .canvas-container {
+                height: 100vh;
+            }
+        }
+
+        #webgl-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            outline: none;
+        }
+        
+        #loader-container {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 100;
+            transition: opacity 0.5s;
+        }
+
+        #loader {
+            width: 80px;
+            height: 80px;
+            border: 8px solid #444;
+            border-radius: 50%;
+            border-top: 8px solid #9c27b0;
+            animation: spin 1.5s linear infinite;
+        }
+
+        #loader-text {
+            margin-top: 20px;
+            font-size: 1.2rem;
+            color: #eee;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Styles for the 3D Labels */
+        .label-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .label {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 8px 15px;
+            border-radius: 8px;
+            font-size: 15px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            white-space: nowrap;
+            transform-origin: 0 0;
+            backdrop-filter: blur(4px);
+        }
+        .label.visible { opacity: 1; }
+        .label-dot {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #fff;
+            border-radius: 50%;
+            opacity: 0;
+            transition: all 0.3s;
+            border: 2px solid rgba(0,0,0,0.5);
+            transform: translate(-50%, -50%);
+        }
+        .label-dot.visible { opacity: 1; }
+        .label-dot.highlight {
+            background: #f39c12;
+            box-shadow: 0 0 15px #f39c12;
+            transform: translate(-50%, -50%) scale(1.5);
+        }
+        .label-line {
+            position: absolute;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.7);
+            opacity: 0;
+            transition: opacity 0.3s;
+            transform-origin: 0 50%;
+        }
+        .label-line.visible { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div class="main-layout">
+        <!-- Right Info Panel -->
+        <aside class="info-panel p-6">
+            <header class="mb-6">
+                <h1 class="text-3xl font-bold text-white">پرتال میکروبیولوژی</h1>
+                <nav class="mt-4">
+                    <ul class="flex space-x-4 space-x-reverse text-lg border-b border-gray-700 pb-3">
+                        <li><a href="#" class="text-gray-300 hover:text-purple-400 transition-colors">خانه</a></li>
+                        <li><a href="#" class="text-purple-400 font-semibold">درسنامه</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-purple-400 transition-colors">مقالات</a></li>
+                        <li><a href="#" class="text-gray-300 hover:text-purple-400 transition-colors">آزمون</a></li>
+                    </ul>
+                </nav>
+            </header>
+            
+            <div class="flex-grow">
+                <h3 class="text-xl font-bold mb-4 border-b-2 border-purple-400 pb-2">اجزای سلول</h3>
+                <ul id="components-list" class="space-y-3 text-md mt-4">
+                    <!-- List items will be populated by JavaScript -->
+                </ul>
+            </div>
+
+            <footer class="mt-6 text-center">
+                <p class="text-gray-500 text-sm">&copy; ۱۴۰۴ - تمامی حقوق محفوظ است.</p>
+            </footer>
+        </aside>
+
+        <!-- Left 3D Canvas Area -->
+        <main class="canvas-container">
+            <div id="loader-container">
+                <div id="loader"></div>
+                <p id="loader-text">در حال بارگذاری مدل سلول...</p>
+            </div>
+            <canvas id="webgl-canvas"></canvas>
+            <div id="label-container" class="label-container"></div>
+        </main>
+    </div>
+
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.157.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+
+        const canvasContainer = document.querySelector('.canvas-container');
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(50, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({
+            canvas: document.getElementById('webgl-canvas'),
+            antialias: true,
+            alpha: true
+        });
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        camera.position.set(0, 5, 25);
+
+        // --- Labels and Components Data ---
+        const points = [
+            { position: new THREE.Vector3(0, 1.5, 0), name: 'هسته' },
+            { position: new THREE.Vector3(2.5, 3.5, 3), name: 'میتوکندری' },
+            { position: new THREE.Vector3(4.5, 0, 0), name: 'شبکه آندوپلاسمی' },
+            { position: new THREE.Vector3(-4.5, 2.5, 1), name: 'دستگاه گلژی' },
+            { position: new THREE.Vector3(0, -4.5, 0), name: 'سیتوپلاسم' },
+            { position: new THREE.Vector3(0, 0, 5.8), name: 'غشای سلولی' },
+            { position: new THREE.Vector3(-3.5, -2, 2.5), name: 'لیزوزوم' }
+        ];
+        const labelContainer = document.getElementById('label-container');
+        const componentsList = document.querySelector('#components-list');
+
+        points.forEach(point => {
+            const textDiv = document.createElement('div');
+            textDiv.className = 'label';
+            textDiv.textContent = point.name;
+            labelContainer.appendChild(textDiv);
+            point.element = textDiv;
+
+            const dotDiv = document.createElement('div');
+            dotDiv.className = 'label-dot';
+            labelContainer.appendChild(dotDiv);
+            point.dotElement = dotDiv;
+
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'label-line';
+            labelContainer.appendChild(lineDiv);
+            point.lineElement = lineDiv;
+
+            const listItem = document.createElement('li');
+            listItem.className = 'cursor-pointer p-2 rounded-md hover:bg-purple-500/30 transition-colors';
+            listItem.textContent = point.name;
+            listItem.addEventListener('mouseenter', () => point.dotElement.classList.add('highlight'));
+            listItem.addEventListener('mouseleave', () => point.dotElement.classList.remove('highlight'));
+            componentsList.appendChild(listItem);
+        });
+
+        new RGBELoader()
+            .setPath('https://threejs.org/examples/textures/equirectangular/')
+            .load('venice_sunset_1k.hdr', (texture) => {
+                texture.mapping = THREE.EquirectangularReflectionMapping;
+                scene.environment = texture;
+            });
+        
+        const loadingManager = new THREE.LoadingManager();
+        const loaderContainer = document.getElementById('loader-container');
+        
+        loadingManager.onLoad = () => {
+            loaderContainer.style.opacity = '0';
+            setTimeout(() => { loaderContainer.style.display = 'none'; }, 500);
+        };
+
+        const loader = new GLTFLoader(loadingManager);
+        const modelUrl = 'https://mohamadjalilvand.github.io/3D.model/animal_cell_-_downloadable.glb';
+        
+        loader.load(modelUrl, (gltf) => {
+            const model = gltf.scene;
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            model.position.sub(center);
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = 10 / maxDim;
+            model.scale.set(scale, scale, scale);
+            scene.add(model);
+        }, undefined, (error) => {
+            console.error('An error occurred loading the model:', error);
+            document.getElementById('loader-text').textContent = 'خطا! لطفاً از فعال بودن GitHub Pages و صحت لینک مطمئن شوید.';
+        });
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.minDistance = 10;
+        controls.maxDistance = 50;
+        controls.autoRotate = false;
+
+        const raycaster = new THREE.Raycaster();
+
+        function animate() {
+            const canvasRect = renderer.domElement.getBoundingClientRect();
+
+            points.forEach(point => {
+                const screenPosition = point.position.clone().project(camera);
+                
+                const screenX = ((screenPosition.x + 1) * canvasRect.width / 2) + canvasRect.left;
+                const screenY = ((-screenPosition.y + 1) * canvasRect.height / 2) + canvasRect.top;
+
+                raycaster.setFromCamera(screenPosition, camera);
+                const intersects = raycaster.intersectObjects(scene.children, true);
+                
+                let isOccluded = false;
+                if (intersects.length > 0) {
+                    const intersectionDistance = intersects[0].distance;
+                    const pointDistance = camera.position.distanceTo(point.position);
+                    if (intersectionDistance < pointDistance - 0.5) isOccluded = true;
+                }
+                
+                const isVisible = !isOccluded && screenPosition.z < 1;
+                
+                point.element.classList.toggle('visible', isVisible);
+                point.dotElement.classList.toggle('visible', isVisible);
+                point.lineElement.classList.toggle('visible', isVisible);
+
+                if (isVisible) {
+                    point.dotElement.style.transform = `translate(${screenX}px, ${screenY}px) ${point.dotElement.classList.contains('highlight') ? 'scale(1.5)' : ''}`;
+                    
+                    const labelOffset = screenX < window.innerWidth / 2 ? 60 : -60;
+                    const labelX = screenX + labelOffset;
+                    const labelY = screenY - 20;
+                    point.element.style.transform = `translate(${labelX}px, ${labelY}px) ${labelOffset < 0 ? 'translateX(-100%)' : ''}`;
+                    
+                    const startX = screenX;
+                    const startY = screenY;
+                    const endX = labelX + (labelOffset < 0 ? point.element.offsetWidth : 0);
+                    const endY = labelY + point.element.offsetHeight / 2;
+                    
+                    const dx = endX - startX;
+                    const dy = endY - startY;
+                    const distance = Math.hypot(dx, dy);
+                    const angle = Math.atan2(dy, dx);
+                    
+                    point.lineElement.style.width = `${distance}px`;
+                    point.lineElement.style.transform = `translate(${startX}px, ${startY}px) rotate(${angle}rad)`;
+                }
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+
+        function onWindowResize() {
+            camera.aspect = canvasContainer.clientWidth / canvasContainer.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        }
+        window.addEventListener('resize', onWindowResize);
+
+        animate();
+    </script>
+</body>
+</html>
